@@ -33,6 +33,15 @@ func TestDiscover(t *testing.T) {
 
 		bridge.SetAuthentication(auth)
 		devices, err := bridge.Devices()
+		if err != nil {
+			t.Fatal(err)
+		}
 		fmt.Printf("%+v\n", devices)
+
+		bridge.EventStream().Register(func(event Event) {
+			fmt.Printf("%v %s\n", event.CreationTime, event.String())
+		})
 	}
+
+	time.Sleep(1 * time.Minute)
 }

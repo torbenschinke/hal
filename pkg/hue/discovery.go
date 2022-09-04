@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -29,12 +30,14 @@ type Bridge struct {
 	Addresses []net.IP // ipv4 and ipv6
 	Port      int
 	client    *http.Client // keep instance for connection pooling
-	auth      *struct {
+	auth      struct {
 		username string
 	}
+	eventStream *EventStream
+	mutex       sync.Mutex
 }
 
-func (b Bridge) Config() (BridgeConfig, error) {
+func (b *Bridge) Config() (BridgeConfig, error) {
 	return request[BridgeConfig](b, http.MethodGet, "/api/0/config", nil)
 }
 
@@ -42,7 +45,7 @@ func (b Bridge) Config() (BridgeConfig, error) {
 // First, the user has to press the link button and
 // then this call must be made to proof that the user is in control of the bridge.
 // See also https://developers.meethue.com/develop/hue-api-v2/getting-started/.
-func (b Bridge) GenerateClientKey(appname, instancename string) (ClientKey, error) {
+func (b *Bridge) GenerateClientKey(appname, instancename string) (ClientKey, error) {
 	type rpcResponse struct {
 		Success *ClientKey `json:"success"`
 		Error   *Error     `json:"error"`
@@ -74,21 +77,40 @@ func (b Bridge) GenerateClientKey(appname, instancename string) (ClientKey, erro
 }
 
 // SetAuthentication requires the secret username (== token) of the one-time linkage with the bridge.
-func (b Bridge) SetAuthentication(username string) {
+func (b *Bridge) SetAuthentication(username string) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	b.auth.username = username
 }
 
-func (b Bridge) Devices() ([]Device, error) {
+// Devices requests all known devices.
+// See also https://developers.meethue.com/develop/hue-api-v2/api-reference/#resource_device.
+func (b *Bridge) Devices() ([]Device, error) {
 	res, err := request[clipv2[Device]](b, http.MethodGet, "/clip/v2/resource/device", nil)
 	if err != nil {
 		return nil, err
 	}
 
-	if res.Errors != nil {
+	if len(res.Errors) != 0 {
 		return nil, res.Errors
 	}
 
 	return res.Data, nil
+}
+
+// EventStream tries to establish the connection once when called the first time.
+// The bridge must be already authenticated using SetAuthentication.
+// See also https://developers.meethue.com/develop/hue-api-v2/core-concepts/#events.
+func (b *Bridge) EventStream() *EventStream {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	if b.eventStream == nil {
+		b.eventStream = newEventStream(b)
+	}
+
+	return b.eventStream
 }
 
 type BridgeConfig struct {
@@ -104,7 +126,7 @@ type BridgeConfig struct {
 
 func newDNSBridge(entry *zeroconf.ServiceEntry) Bridge {
 	var bridge Bridge
-	bridge.auth = &struct {
+	bridge.auth = struct {
 		username string
 	}{}
 	for _, text := range entry.Text {

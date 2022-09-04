@@ -42,7 +42,7 @@ func newClient(bridgeId string) *http.Client {
 	}
 }
 
-func request[T any](bridge Bridge, method string, path string, body any) (T, error) {
+func request[T any](bridge *Bridge, method string, path string, body any) (T, error) {
 	var t T
 	if len(bridge.Addresses) == 0 {
 		return t, fmt.Errorf("no ip to connect")
@@ -100,6 +100,6 @@ func request[T any](bridge Bridge, method string, path string, body any) (T, err
 }
 
 type clipv2[T any] struct {
-	Errors *ErrorList `json:"errors"`
-	Data   []T        `json:"data"`
+	Errors ErrorList `json:"errors"`
+	Data   []T       `json:"data"`
 }

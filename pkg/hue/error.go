@@ -6,21 +6,19 @@ import (
 )
 
 // An ErrorList is like [{"error":{"type":101,"address":"","description":"link button not pressed"}}].
-type ErrorList struct {
-	Errors []Error `json:"errors"`
-}
+type ErrorList []Error
 
 func (e ErrorList) Unwrap() error {
-	if len(e.Errors) == 0 {
+	if len(e) == 0 {
 		return nil
 	}
 
-	return e.Errors[0] // other errors are suppressed
+	return e[0] // other errors are suppressed
 }
 
 func (e ErrorList) Error() string {
 	var sb strings.Builder
-	for _, err := range e.Errors {
+	for _, err := range e {
 		sb.WriteString(err.Error())
 		sb.WriteString("\n")
 	}
