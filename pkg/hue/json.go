@@ -17,7 +17,7 @@ import (
 var cacert []byte
 
 func newClient(bridgeId string) *http.Client {
-	// hue bridges currently do not support IP SANs but just
+	// hue bridges currently do not support IP   but just
 	// the CA name, which is not supported anymore, see also
 	// https://golang.google.cn/doc/go1.15#commonname and
 	// https://developers.meethue.com/develop/application-design-guidance/using-https/
